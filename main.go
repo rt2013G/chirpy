@@ -8,13 +8,17 @@ import (
 	"os"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/joho/godotenv"
 )
 
 type apiConfig struct {
+	database       *DB
 	fileserverHits int
+	jwtSecret      []byte
 }
 
 func main() {
+	godotenv.Load()
 	debug := flag.Bool("debug", false, "Enable debug mode")
 	flag.Parse()
 
@@ -27,13 +31,15 @@ func main() {
 	const port = "8080"
 	dbPath := "database.json"
 
-	apiCfg := apiConfig{
-		fileserverHits: 0,
-	}
-
 	db, err := NewDB(dbPath)
 	if err != nil {
 		log.Fatal("error while creating db")
+	}
+
+	apiCfg := apiConfig{
+		database:       db,
+		fileserverHits: 0,
+		jwtSecret:      []byte(os.Getenv("JWT_SECRET")),
 	}
 
 	router := chi.NewRouter()
@@ -45,11 +51,12 @@ func main() {
 	apiRouter := chi.NewRouter()
 	apiRouter.Get("/healthz", handlerReadiness)
 	apiRouter.Get("/reset", apiCfg.handlerReset)
-	apiRouter.Post("/chirps", db.postChirp)
-	apiRouter.Get("/chirps", db.getChirps)
-	apiRouter.Get("/chirps/{chirpID}", db.getChirps)
-	apiRouter.Post("/users", db.postUser)
-	apiRouter.Post("/login", db.loginUser)
+	apiRouter.Post("/chirps", apiCfg.postChirp)
+	apiRouter.Get("/chirps", apiCfg.getChirps)
+	apiRouter.Get("/chirps/{chirpID}", apiCfg.getChirps)
+	apiRouter.Post("/users", apiCfg.postUser)
+	apiRouter.Put("/users", apiCfg.putUser)
+	apiRouter.Post("/login", apiCfg.loginUser)
 	router.Mount("/api", apiRouter)
 
 	adminRouter := chi.NewRouter()

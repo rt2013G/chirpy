@@ -9,7 +9,7 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-func (db *DB) postChirp(w http.ResponseWriter, r *http.Request) {
+func (apiCfg *apiConfig) postChirp(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 	params := chirpParameters{}
 	err := decoder.Decode(&params)
@@ -35,7 +35,7 @@ func (db *DB) postChirp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	responseChirpResource := db.CreateChirp(cleanBody(params.Body))
+	responseChirpResource := apiCfg.database.CreateChirp(cleanBody(params.Body))
 
 	data, _ := json.Marshal(responseChirpResource)
 	w.Header().Set("Content-Type", "application/json")
@@ -43,7 +43,7 @@ func (db *DB) postChirp(w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 
-func (db *DB) getChirps(w http.ResponseWriter, r *http.Request) {
+func (apiCfg *apiConfig) getChirps(w http.ResponseWriter, r *http.Request) {
 	param := chi.URLParam(r, "chirpID")
 	var data []byte
 	if len(param) > 0 {
@@ -58,7 +58,7 @@ func (db *DB) getChirps(w http.ResponseWriter, r *http.Request) {
 			w.Write(data)
 			return
 		}
-		chirp, ok := db.GetChirpWithId(id)
+		chirp, ok := apiCfg.database.GetChirpWithId(id)
 		if !ok {
 			responseBody := errorResponseBody{
 				Error: "Chirp doesn't exist",
@@ -71,7 +71,7 @@ func (db *DB) getChirps(w http.ResponseWriter, r *http.Request) {
 		}
 		data, _ = json.Marshal(chirp)
 	} else {
-		chirps, _ := db.GetChirps()
+		chirps, _ := apiCfg.database.GetChirps()
 		data, _ = json.Marshal(chirps)
 	}
 	w.Header().Set("Content-Type", "application/json")

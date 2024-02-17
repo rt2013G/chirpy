@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"sync"
+	"time"
 )
 
 type DB struct {
@@ -37,13 +38,20 @@ type user struct {
 }
 
 type userParams struct {
-	Password string `json:"password"`
-	Email    string `json:"email"`
+	Password string        `json:"password"`
+	Email    string        `json:"email"`
+	TTL      time.Duration `json:"expires_in_seconds"`
 }
 
 type userResponse struct {
 	Email string `json:"email"`
 	Id    int    `json:"id"`
+}
+
+type userResponseJWT struct {
+	Email string `json:"email"`
+	Id    int    `json:"id"`
+	Token string `json:"token"`
 }
 
 func NewDB(path string) (*DB, error) {
@@ -141,6 +149,21 @@ func (db *DB) CreateUser(email string, passwordHash []byte) userResponse {
 	userResp := userResponse{
 		Email: email,
 		Id:    newUser.Id,
+	}
+	return userResp
+}
+
+func (db *DB) UpdateUser(id int, email string, passwordHash []byte) userResponse {
+	dbData := db.loadDB()
+	user := dbData.Users[id]
+	user.Email = email
+	user.PasswordHash = passwordHash
+	dbData.Users[id] = user
+	db.writeDB(dbData)
+
+	userResp := userResponse{
+		Email: email,
+		Id:    id,
 	}
 	return userResp
 }
