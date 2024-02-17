@@ -31,12 +31,19 @@ type fullChirpResource struct {
 }
 
 type user struct {
-	Email string `json:"email"`
-	Id    int    `json:"id"`
+	Email        string `json:"email"`
+	PasswordHash []byte `json:"password_hash"`
+	Id           int    `json:"id"`
 }
 
 type userParams struct {
+	Password string `json:"password"`
+	Email    string `json:"email"`
+}
+
+type userResponse struct {
 	Email string `json:"email"`
+	Id    int    `json:"id"`
 }
 
 func NewDB(path string) (*DB, error) {
@@ -121,13 +128,19 @@ func (db *DB) CreateChirp(body string) fullChirpResource {
 	return newChirp
 }
 
-func (db *DB) CreateUser(email string) user {
+func (db *DB) CreateUser(email string, passwordHash []byte) userResponse {
 	dbData := db.loadDB()
 	newUser := user{
-		Email: email,
-		Id:    len(dbData.Users) + 1,
+		Email:        email,
+		PasswordHash: passwordHash,
+		Id:           len(dbData.Users) + 1,
 	}
 	dbData.Users[newUser.Id] = newUser
 	db.writeDB(dbData)
-	return newUser
+
+	userResp := userResponse{
+		Email: email,
+		Id:    newUser.Id,
+	}
+	return userResp
 }
