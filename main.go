@@ -1,9 +1,11 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -13,6 +15,15 @@ type apiConfig struct {
 }
 
 func main() {
+	debug := flag.Bool("debug", false, "Enable debug mode")
+	flag.Parse()
+
+	if *debug {
+		if err := os.Remove("database.json"); err != nil {
+			log.Fatal(err)
+		}
+	}
+
 	const port = "8080"
 	dbPath := "database.json"
 
@@ -37,6 +48,7 @@ func main() {
 	apiRouter.Post("/chirps", db.postChirp)
 	apiRouter.Get("/chirps", db.getChirps)
 	apiRouter.Get("/chirps/{chirpID}", db.getChirps)
+	apiRouter.Post("/users", db.postUser)
 	router.Mount("/api", apiRouter)
 
 	adminRouter := chi.NewRouter()

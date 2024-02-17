@@ -9,19 +9,6 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-type chirpParameters struct {
-	Body string `json:"body"`
-}
-
-type errorResponseBody struct {
-	Error string `json:"error"`
-}
-
-type fullChirpResource struct {
-	Body string `json:"body"`
-	Id   int    `json:"id"`
-}
-
 func (db *DB) postChirp(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 	params := chirpParameters{}
