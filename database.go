@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"log"
+	"net/http"
 	"os"
 	"sync"
 	"time"
@@ -14,8 +15,9 @@ type DB struct {
 }
 
 type DBStructure struct {
-	Chirps map[int]fullChirpResource `json:"chirps"`
-	Users  map[int]user              `json:"users"`
+	Chirps        map[int]fullChirpResource `json:"chirps"`
+	Users         map[int]user              `json:"users"`
+	RevokedTokens map[string]time.Time      `json:"revoked_tokens"`
 }
 
 type errorResponseBody struct {
@@ -38,9 +40,8 @@ type user struct {
 }
 
 type userParams struct {
-	Password string        `json:"password"`
-	Email    string        `json:"email"`
-	TTL      time.Duration `json:"expires_in_seconds"`
+	Password string `json:"password"`
+	Email    string `json:"email"`
 }
 
 type userResponse struct {
@@ -49,17 +50,28 @@ type userResponse struct {
 }
 
 type userResponseJWT struct {
-	Email string `json:"email"`
-	Id    int    `json:"id"`
+	Email        string `json:"email"`
+	Id           int    `json:"id"`
+	Token        string `json:"token"`
+	RefreshToken string `json:"refresh_token"`
+}
+
+type tokenResponse struct {
 	Token string `json:"token"`
 }
+
+const (
+	TOKEN_TTL_HOURS         = 1
+	REFRESH_TOKEN_TTL_HOURS = 1440
+)
 
 func NewDB(path string) (*DB, error) {
 	_, err := os.Stat(path)
 	if os.IsNotExist(err) {
 		dbStructure := DBStructure{
-			Chirps: map[int]fullChirpResource{},
-			Users:  map[int]user{},
+			Chirps:        map[int]fullChirpResource{},
+			Users:         map[int]user{},
+			RevokedTokens: map[string]time.Time{},
 		}
 		jsonDb, _ := json.Marshal(dbStructure)
 		err := os.WriteFile(path, jsonDb, 0666)
@@ -166,4 +178,26 @@ func (db *DB) UpdateUser(id int, email string, passwordHash []byte) userResponse
 		Id:    id,
 	}
 	return userResp
+}
+
+func ServerErrorResponse(w http.ResponseWriter) {
+	responseBody := errorResponseBody{
+		Error: "Something went wrong",
+	}
+	data, _ := json.Marshal(responseBody)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	w.Write(data)
+}
+
+func (db *DB) isRevoked(token string) bool {
+	dbData := db.loadDB()
+	_, ok := dbData.RevokedTokens[token]
+	return ok
+}
+
+func (db *DB) revoke(token string) {
+	dbData := db.loadDB()
+	dbData.RevokedTokens[token] = time.Now().UTC()
+	db.writeDB(dbData)
 }

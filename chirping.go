@@ -49,13 +49,7 @@ func (apiCfg *apiConfig) getChirps(w http.ResponseWriter, r *http.Request) {
 	if len(param) > 0 {
 		id, err := strconv.Atoi(param)
 		if err != nil {
-			responseBody := errorResponseBody{
-				Error: "Something went wrong",
-			}
-			data, _ := json.Marshal(responseBody)
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(500)
-			w.Write(data)
+			ServerErrorResponse(w)
 			return
 		}
 		chirp, ok := apiCfg.database.GetChirpWithId(id)

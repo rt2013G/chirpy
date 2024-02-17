@@ -17,13 +17,7 @@ func (apiCfg *apiConfig) postUser(w http.ResponseWriter, r *http.Request) {
 	params := userParams{}
 	err := decoder.Decode(&params)
 	if err != nil {
-		responseBody := errorResponseBody{
-			Error: "Something went wrong",
-		}
-		data, _ := json.Marshal(responseBody)
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(500)
-		w.Write(data)
+		ServerErrorResponse(w)
 		return
 	}
 	passwordHash, _ := bcrypt.GenerateFromPassword([]byte(params.Password), 10)
@@ -40,13 +34,7 @@ func (apiCfg *apiConfig) loginUser(w http.ResponseWriter, r *http.Request) {
 	params := userParams{}
 	err := decoder.Decode(&params)
 	if err != nil {
-		responseBody := errorResponseBody{
-			Error: "Something went wrong",
-		}
-		data, _ := json.Marshal(responseBody)
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(500)
-		w.Write(data)
+		ServerErrorResponse(w)
 		return
 	}
 	dbStructure := apiCfg.database.loadDB()
@@ -62,31 +50,36 @@ func (apiCfg *apiConfig) loginUser(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(401)
 		return
 	}
-	if params.TTL == 0 {
-		params.TTL = 86400
-	}
+
 	claims := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.RegisteredClaims{
-		Issuer:    "chirpy",
+		Issuer:    "chirpy-access",
 		IssuedAt:  jwt.NewNumericDate(time.Now()),
-		ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Second * params.TTL)),
+		ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour * TOKEN_TTL_HOURS)),
 		Subject:   fmt.Sprint(usrToSearch.Id),
 	})
 	token, err := claims.SignedString(apiCfg.jwtSecret)
 	if err != nil {
-		responseBody := errorResponseBody{
-			Error: "Something went wrong",
-		}
-		data, _ := json.Marshal(responseBody)
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(500)
-		w.Write(data)
+		ServerErrorResponse(w)
+		return
+	}
+
+	claims = jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.RegisteredClaims{
+		Issuer:    "chirpy-refresh",
+		IssuedAt:  jwt.NewNumericDate(time.Now()),
+		ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour * REFRESH_TOKEN_TTL_HOURS)),
+		Subject:   fmt.Sprint(usrToSearch.Id),
+	})
+	refresh_token, err := claims.SignedString(apiCfg.jwtSecret)
+	if err != nil {
+		ServerErrorResponse(w)
 		return
 	}
 
 	resp := userResponseJWT{
-		Id:    usrToSearch.Id,
-		Email: usrToSearch.Email,
-		Token: token,
+		Id:           usrToSearch.Id,
+		Email:        usrToSearch.Email,
+		Token:        token,
+		RefreshToken: refresh_token,
 	}
 	data, _ := json.Marshal(resp)
 	w.Header().Set("Content-Type", "application/json")
@@ -99,13 +92,7 @@ func (apiCfg *apiConfig) putUser(w http.ResponseWriter, r *http.Request) {
 	params := userParams{}
 	err := decoder.Decode(&params)
 	if err != nil {
-		responseBody := errorResponseBody{
-			Error: "Something went wrong",
-		}
-		data, _ := json.Marshal(responseBody)
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(500)
-		w.Write(data)
+		ServerErrorResponse(w)
 		return
 	}
 
@@ -116,26 +103,21 @@ func (apiCfg *apiConfig) putUser(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(401)
 		return
 	}
+
+	issuer, err := token.Claims.GetIssuer()
+	if err != nil || issuer == "chirpy-refresh" {
+		w.WriteHeader(401)
+		return
+	}
+
 	usrId, err := token.Claims.GetSubject()
 	if err != nil {
-		responseBody := errorResponseBody{
-			Error: "Something went wrong",
-		}
-		data, _ := json.Marshal(responseBody)
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(500)
-		w.Write(data)
+		ServerErrorResponse(w)
 		return
 	}
 	id, err := strconv.Atoi(usrId)
 	if err != nil {
-		responseBody := errorResponseBody{
-			Error: "Something went wrong",
-		}
-		data, _ := json.Marshal(responseBody)
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(500)
-		w.Write(data)
+		ServerErrorResponse(w)
 		return
 	}
 	passwordHash, _ := bcrypt.GenerateFromPassword([]byte(params.Password), 10)
@@ -145,4 +127,57 @@ func (apiCfg *apiConfig) putUser(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
 	w.Write(data)
+}
+
+func (apiCfg *apiConfig) refreshUserToken(w http.ResponseWriter, r *http.Request) {
+	receivedToken := strings.TrimPrefix(r.Header.Get("authorization"), "Bearer ")
+	claims := jwt.RegisteredClaims{}
+	token, err := jwt.ParseWithClaims(receivedToken, &claims, func(token *jwt.Token) (interface{}, error) { return []byte(apiCfg.jwtSecret), nil })
+	if err != nil {
+		w.WriteHeader(401)
+		return
+	}
+	issuer, err := token.Claims.GetIssuer()
+	if err != nil || issuer != "chirpy-refresh" || apiCfg.database.isRevoked(receivedToken) {
+		w.WriteHeader(401)
+		return
+	}
+
+	usrId, err := token.Claims.GetSubject()
+	if err != nil {
+		ServerErrorResponse(w)
+		return
+	}
+	id, err := strconv.Atoi(usrId)
+	if err != nil {
+		ServerErrorResponse(w)
+		return
+	}
+
+	accessClaims := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.RegisteredClaims{
+		Issuer:    "chirpy-access",
+		IssuedAt:  jwt.NewNumericDate(time.Now()),
+		ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour * TOKEN_TTL_HOURS)),
+		Subject:   fmt.Sprint(id),
+	})
+	newAccessToken, err := accessClaims.SignedString(apiCfg.jwtSecret)
+	if err != nil {
+		ServerErrorResponse(w)
+		return
+	}
+
+	accessToken := tokenResponse{
+		Token: newAccessToken,
+	}
+
+	data, _ := json.Marshal(accessToken)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	w.Write(data)
+}
+
+func (apiCfg *apiConfig) revokeToken(w http.ResponseWriter, r *http.Request) {
+	receivedToken := strings.TrimPrefix(r.Header.Get("authorization"), "Bearer ")
+	apiCfg.database.revoke(receivedToken)
+	w.WriteHeader(200)
 }
