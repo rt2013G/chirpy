@@ -3,7 +3,10 @@ package main
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
+
+	"github.com/go-chi/chi/v5"
 )
 
 type chirpParameters struct {
@@ -29,8 +32,8 @@ func (db *DB) postChirp(w http.ResponseWriter, r *http.Request) {
 		}
 		data, _ := json.Marshal(responseBody)
 		w.Header().Set("Content-Type", "application/json")
-		w.Write(data)
 		w.WriteHeader(500)
+		w.Write(data)
 		return
 	}
 
@@ -40,8 +43,8 @@ func (db *DB) postChirp(w http.ResponseWriter, r *http.Request) {
 		}
 		data, _ := json.Marshal(responseBody)
 		w.Header().Set("Content-Type", "application/json")
-		w.Write(data)
 		w.WriteHeader(400)
+		w.Write(data)
 		return
 	}
 
@@ -54,8 +57,36 @@ func (db *DB) postChirp(w http.ResponseWriter, r *http.Request) {
 }
 
 func (db *DB) getChirps(w http.ResponseWriter, r *http.Request) {
-	chirps, _ := db.GetChirps()
-	data, _ := json.Marshal(chirps)
+	param := chi.URLParam(r, "chirpID")
+	var data []byte
+	if len(param) > 0 {
+		id, err := strconv.Atoi(param)
+		if err != nil {
+			responseBody := errorResponseBody{
+				Error: "Something went wrong",
+			}
+			data, _ := json.Marshal(responseBody)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(500)
+			w.Write(data)
+			return
+		}
+		chirp, ok := db.GetChirpWithId(id)
+		if !ok {
+			responseBody := errorResponseBody{
+				Error: "Chirp doesn't exist",
+			}
+			data, _ := json.Marshal(responseBody)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(404)
+			w.Write(data)
+			return
+		}
+		data, _ = json.Marshal(chirp)
+	} else {
+		chirps, _ := db.GetChirps()
+		data, _ = json.Marshal(chirps)
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
 	w.Write(data)

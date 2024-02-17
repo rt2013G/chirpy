@@ -64,6 +64,16 @@ func (db *DB) GetChirps() ([]fullChirpResource, error) {
 	return chirpsList, nil
 }
 
+func (db *DB) GetChirpWithId(id int) (fullChirpResource, bool) {
+	chirps := db.loadDB()
+	chirp, ok := chirps.Chirps[id]
+	if !ok {
+		return fullChirpResource{}, false
+	}
+
+	return chirp, true
+}
+
 func (db *DB) writeDB(dbStructure DBStructure) error {
 	data, err := json.Marshal(dbStructure)
 	if err != nil {
