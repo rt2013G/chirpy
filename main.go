@@ -14,9 +14,15 @@ type apiConfig struct {
 
 func main() {
 	const port = "8080"
+	dbPath := "database.json"
 
 	apiCfg := apiConfig{
 		fileserverHits: 0,
+	}
+
+	db, err := NewDB(dbPath)
+	if err != nil {
+		log.Fatal("error while creating db")
 	}
 
 	router := chi.NewRouter()
@@ -28,7 +34,8 @@ func main() {
 	apiRouter := chi.NewRouter()
 	apiRouter.Get("/healthz", handlerReadiness)
 	apiRouter.Get("/reset", apiCfg.handlerReset)
-	apiRouter.Post("/validate_chirp", handlerChirpValidation)
+	apiRouter.Post("/chirps", db.postChirp)
+	apiRouter.Get("/chirps", db.getChirps)
 	router.Mount("/api", apiRouter)
 
 	adminRouter := chi.NewRouter()

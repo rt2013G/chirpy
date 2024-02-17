@@ -14,11 +14,12 @@ type errorResponseBody struct {
 	Error string `json:"error"`
 }
 
-type cleanedResponseBody struct {
-	CleanedBody string `json:"cleaned_body"`
+type fullChirpResource struct {
+	Body string `json:"body"`
+	Id   int    `json:"id"`
 }
 
-func handlerChirpValidation(w http.ResponseWriter, r *http.Request) {
+func (db *DB) postChirp(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 	params := chirpParameters{}
 	err := decoder.Decode(&params)
@@ -39,19 +40,25 @@ func handlerChirpValidation(w http.ResponseWriter, r *http.Request) {
 		}
 		data, _ := json.Marshal(responseBody)
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(400)
 		w.Write(data)
+		w.WriteHeader(400)
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
-	responseBody := cleanedResponseBody{
-		CleanedBody: cleanBody(params.Body),
-	}
-	data, _ := json.Marshal(responseBody)
+	responseChirpResource := db.CreateChirp(cleanBody(params.Body))
+
+	data, _ := json.Marshal(responseChirpResource)
 	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
 	w.Write(data)
-	w.WriteHeader(500)
+}
+
+func (db *DB) getChirps(w http.ResponseWriter, r *http.Request) {
+	chirps, _ := db.GetChirps()
+	data, _ := json.Marshal(chirps)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	w.Write(data)
 }
 
 func cleanBody(body string) string {
