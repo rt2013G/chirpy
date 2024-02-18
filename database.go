@@ -112,11 +112,17 @@ func (db *DB) loadDB() DBStructure {
 	return chirpData
 }
 
-func (db *DB) GetChirps() ([]fullChirpResource, error) {
+func (db *DB) GetChirps(asc bool) ([]fullChirpResource, error) {
 	dbStructure := db.loadDB()
 	chirpsList := make([]fullChirpResource, 0)
-	for _, chirp := range dbStructure.Chirps {
-		chirpsList = append(chirpsList, chirp)
+	if asc {
+		for _, chirp := range dbStructure.Chirps {
+			chirpsList = append(chirpsList, chirp)
+		}
+	} else {
+		for i := len(dbStructure.Chirps); i > 0; i-- {
+			chirpsList = append(chirpsList, dbStructure.Chirps[i])
+		}
 	}
 
 	return chirpsList, nil

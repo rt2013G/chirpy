@@ -111,7 +111,12 @@ func (apiCfg *apiConfig) getChirps(w http.ResponseWriter, r *http.Request) {
 			chirps := apiCfg.database.GetChirpsFromAuthorId(usrId)
 			data, _ = json.Marshal(chirps)
 		} else {
-			chirps, _ := apiCfg.database.GetChirps()
+			sort := r.URL.Query().Get("sort")
+			asc := true
+			if len(sort) > 0 && sort == "desc" {
+				asc = false
+			}
+			chirps, _ := apiCfg.database.GetChirps(asc)
 			data, _ = json.Marshal(chirps)
 		}
 	}
