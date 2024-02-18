@@ -102,8 +102,18 @@ func (apiCfg *apiConfig) getChirps(w http.ResponseWriter, r *http.Request) {
 		}
 		data, _ = json.Marshal(chirp)
 	} else {
-		chirps, _ := apiCfg.database.GetChirps()
-		data, _ = json.Marshal(chirps)
+		author := r.URL.Query().Get("author_id")
+		if len(author) > 0 {
+			usrId, err := strconv.Atoi(author)
+			if err != nil {
+				ServerErrorResponse(w)
+			}
+			chirps := apiCfg.database.GetChirpsFromAuthorId(usrId)
+			data, _ = json.Marshal(chirps)
+		} else {
+			chirps, _ := apiCfg.database.GetChirps()
+			data, _ = json.Marshal(chirps)
+		}
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)

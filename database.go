@@ -32,15 +32,16 @@ type chirpParameters struct {
 }
 
 type fullChirpResource struct {
+	AuthorId int    `json:"author_id"`
 	Id       int    `json:"id"`
 	Body     string `json:"body"`
-	AuthorId int    `json:"author_id"`
 }
 
 type user struct {
 	Email        string `json:"email"`
 	PasswordHash []byte `json:"password_hash"`
 	Id           int    `json:"id"`
+	IsChirpyRed  bool   `json:"is_chirpy_red"`
 }
 
 type userParams struct {
@@ -49,13 +50,15 @@ type userParams struct {
 }
 
 type userResponse struct {
-	Email string `json:"email"`
-	Id    int    `json:"id"`
+	Email       string `json:"email"`
+	Id          int    `json:"id"`
+	IsChirpyRed bool   `json:"is_chirpy_red"`
 }
 
 type userResponseJWT struct {
 	Email        string `json:"email"`
 	Id           int    `json:"id"`
+	IsChirpyRed  bool   `json:"is_chirpy_red"`
 	Token        string `json:"token"`
 	RefreshToken string `json:"refresh_token"`
 }
@@ -129,6 +132,18 @@ func (db *DB) GetChirpWithId(id int) (fullChirpResource, bool) {
 	return chirp, true
 }
 
+func (db *DB) GetChirpsFromAuthorId(authorId int) []fullChirpResource {
+	dbData := db.loadDB()
+	chirpsToReturn := make([]fullChirpResource, 0)
+	for _, chirp := range dbData.Chirps {
+		if chirp.AuthorId == authorId {
+			chirpsToReturn = append(chirpsToReturn, chirp)
+		}
+	}
+
+	return chirpsToReturn
+}
+
 func (db *DB) writeDB(dbStructure DBStructure) error {
 	data, err := json.Marshal(dbStructure)
 	if err != nil {
@@ -146,9 +161,9 @@ func (db *DB) writeDB(dbStructure DBStructure) error {
 func (db *DB) CreateChirp(body string, author_id int) fullChirpResource {
 	chirpData := db.loadDB()
 	newChirp := fullChirpResource{
+		AuthorId: author_id,
 		Body:     body,
 		Id:       len(chirpData.Chirps) + 1,
-		AuthorId: author_id,
 	}
 	chirpData.Chirps[newChirp.Id] = newChirp
 	db.writeDB(chirpData)
@@ -161,13 +176,15 @@ func (db *DB) CreateUser(email string, passwordHash []byte) userResponse {
 		Email:        email,
 		PasswordHash: passwordHash,
 		Id:           len(dbData.Users) + 1,
+		IsChirpyRed:  false,
 	}
 	dbData.Users[newUser.Id] = newUser
 	db.writeDB(dbData)
 
 	userResp := userResponse{
-		Email: email,
-		Id:    newUser.Id,
+		Email:       email,
+		Id:          newUser.Id,
+		IsChirpyRed: newUser.IsChirpyRed,
 	}
 	return userResp
 }
@@ -181,8 +198,9 @@ func (db *DB) UpdateUser(id int, email string, passwordHash []byte) userResponse
 	db.writeDB(dbData)
 
 	userResp := userResponse{
-		Email: email,
-		Id:    id,
+		Email:       email,
+		Id:          id,
+		IsChirpyRed: user.IsChirpyRed,
 	}
 	return userResp
 }

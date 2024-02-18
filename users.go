@@ -78,6 +78,7 @@ func (apiCfg *apiConfig) loginUser(w http.ResponseWriter, r *http.Request) {
 	resp := userResponseJWT{
 		Id:           usrToSearch.Id,
 		Email:        usrToSearch.Email,
+		IsChirpyRed:  usrToSearch.IsChirpyRed,
 		Token:        token,
 		RefreshToken: refresh_token,
 	}
