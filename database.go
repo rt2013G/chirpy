@@ -5,8 +5,11 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"sync"
 	"time"
+
+	"github.com/golang-jwt/jwt/v5"
 )
 
 type DB struct {
@@ -29,8 +32,9 @@ type chirpParameters struct {
 }
 
 type fullChirpResource struct {
-	Id   int    `json:"id"`
-	Body string `json:"body"`
+	Id       int    `json:"id"`
+	Body     string `json:"body"`
+	AuthorId int    `json:"author_id"`
 }
 
 type user struct {
@@ -63,6 +67,8 @@ type tokenResponse struct {
 const (
 	TOKEN_TTL_HOURS         = 1
 	REFRESH_TOKEN_TTL_HOURS = 1440
+	CHIRPY_ACCESS           = "chirpy-access"
+	CHIRPY_REFRESH          = "chirpy-refresh"
 )
 
 func NewDB(path string) (*DB, error) {
@@ -137,11 +143,12 @@ func (db *DB) writeDB(dbStructure DBStructure) error {
 	return nil
 }
 
-func (db *DB) CreateChirp(body string) fullChirpResource {
+func (db *DB) CreateChirp(body string, author_id int) fullChirpResource {
 	chirpData := db.loadDB()
 	newChirp := fullChirpResource{
-		Body: body,
-		Id:   len(chirpData.Chirps) + 1,
+		Body:     body,
+		Id:       len(chirpData.Chirps) + 1,
+		AuthorId: author_id,
 	}
 	chirpData.Chirps[newChirp.Id] = newChirp
 	db.writeDB(chirpData)
@@ -180,6 +187,12 @@ func (db *DB) UpdateUser(id int, email string, passwordHash []byte) userResponse
 	return userResp
 }
 
+func (db *DB) DeleteChirp(chirpId int) {
+	dbData := db.loadDB()
+	delete(dbData.Chirps, chirpId)
+	db.writeDB(dbData)
+}
+
 func ServerErrorResponse(w http.ResponseWriter) {
 	responseBody := errorResponseBody{
 		Error: "Something went wrong",
@@ -200,4 +213,29 @@ func (db *DB) revoke(token string) {
 	dbData := db.loadDB()
 	dbData.RevokedTokens[token] = time.Now().UTC()
 	db.writeDB(dbData)
+}
+
+func (apiCfg *apiConfig) validateAccessTokenAndGetUsrID(accessToken string, w http.ResponseWriter) (userId int, ok bool) {
+	claims := jwt.RegisteredClaims{}
+	token, err := jwt.ParseWithClaims(accessToken, &claims, func(token *jwt.Token) (interface{}, error) { return []byte(apiCfg.jwtSecret), nil })
+	if err != nil {
+		w.WriteHeader(401)
+		return 0, false
+	}
+	issuer, err := token.Claims.GetIssuer()
+	if err != nil || issuer != CHIRPY_ACCESS || apiCfg.database.isRevoked(accessToken) {
+		w.WriteHeader(401)
+		return 0, false
+	}
+	usrId, err := token.Claims.GetSubject()
+	if err != nil {
+		ServerErrorResponse(w)
+		return 0, false
+	}
+	id, err := strconv.Atoi(usrId)
+	if err != nil {
+		ServerErrorResponse(w)
+		return 0, false
+	}
+	return id, true
 }

@@ -52,7 +52,7 @@ func (apiCfg *apiConfig) loginUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	claims := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.RegisteredClaims{
-		Issuer:    "chirpy-access",
+		Issuer:    CHIRPY_ACCESS,
 		IssuedAt:  jwt.NewNumericDate(time.Now()),
 		ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour * TOKEN_TTL_HOURS)),
 		Subject:   fmt.Sprint(usrToSearch.Id),
@@ -64,7 +64,7 @@ func (apiCfg *apiConfig) loginUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	claims = jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.RegisteredClaims{
-		Issuer:    "chirpy-refresh",
+		Issuer:    CHIRPY_REFRESH,
 		IssuedAt:  jwt.NewNumericDate(time.Now()),
 		ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour * REFRESH_TOKEN_TTL_HOURS)),
 		Subject:   fmt.Sprint(usrToSearch.Id),
@@ -105,7 +105,7 @@ func (apiCfg *apiConfig) putUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	issuer, err := token.Claims.GetIssuer()
-	if err != nil || issuer == "chirpy-refresh" {
+	if err != nil || issuer == CHIRPY_REFRESH {
 		w.WriteHeader(401)
 		return
 	}
@@ -138,7 +138,7 @@ func (apiCfg *apiConfig) refreshUserToken(w http.ResponseWriter, r *http.Request
 		return
 	}
 	issuer, err := token.Claims.GetIssuer()
-	if err != nil || issuer != "chirpy-refresh" || apiCfg.database.isRevoked(receivedToken) {
+	if err != nil || issuer != CHIRPY_REFRESH || apiCfg.database.isRevoked(receivedToken) {
 		w.WriteHeader(401)
 		return
 	}
@@ -155,7 +155,7 @@ func (apiCfg *apiConfig) refreshUserToken(w http.ResponseWriter, r *http.Request
 	}
 
 	accessClaims := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.RegisteredClaims{
-		Issuer:    "chirpy-access",
+		Issuer:    CHIRPY_ACCESS,
 		IssuedAt:  jwt.NewNumericDate(time.Now()),
 		ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour * TOKEN_TTL_HOURS)),
 		Subject:   fmt.Sprint(id),

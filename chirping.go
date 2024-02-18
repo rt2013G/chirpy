@@ -10,6 +10,12 @@ import (
 )
 
 func (apiCfg *apiConfig) postChirp(w http.ResponseWriter, r *http.Request) {
+	receivedToken := strings.TrimPrefix(r.Header.Get("authorization"), "Bearer ")
+	id, ok := apiCfg.validateAccessTokenAndGetUsrID(receivedToken, w)
+	if !ok {
+		return
+	}
+
 	decoder := json.NewDecoder(r.Body)
 	params := chirpParameters{}
 	err := decoder.Decode(&params)
@@ -35,12 +41,43 @@ func (apiCfg *apiConfig) postChirp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	responseChirpResource := apiCfg.database.CreateChirp(cleanBody(params.Body))
+	responseChirpResource := apiCfg.database.CreateChirp(cleanBody(params.Body), id)
 
 	data, _ := json.Marshal(responseChirpResource)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(201)
 	w.Write(data)
+}
+
+func (apiCfg *apiConfig) deleteChirp(w http.ResponseWriter, r *http.Request) {
+	receivedToken := strings.TrimPrefix(r.Header.Get("authorization"), "Bearer ")
+	usrId, ok := apiCfg.validateAccessTokenAndGetUsrID(receivedToken, w)
+	if !ok {
+		return
+	}
+	param := chi.URLParam(r, "chirpID")
+	chirpId, err := strconv.Atoi(param)
+	if err != nil {
+		ServerErrorResponse(w)
+		return
+	}
+	chirp, ok := apiCfg.database.GetChirpWithId(chirpId)
+	if !ok {
+		responseBody := errorResponseBody{
+			Error: "Chirp doesn't exist",
+		}
+		data, _ := json.Marshal(responseBody)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(404)
+		w.Write(data)
+		return
+	}
+	if chirp.AuthorId != usrId {
+		w.WriteHeader(403)
+		return
+	}
+	apiCfg.database.DeleteChirp(chirpId)
+	w.WriteHeader(200)
 }
 
 func (apiCfg *apiConfig) getChirps(w http.ResponseWriter, r *http.Request) {
