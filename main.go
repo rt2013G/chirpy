@@ -28,7 +28,7 @@ func main() {
 		}
 	}
 
-	const port = "8080"
+	port := os.Getenv("PORT")
 	dbPath := "database.json"
 
 	db, err := NewDB(dbPath)
@@ -45,6 +45,7 @@ func main() {
 	router := chi.NewRouter()
 
 	fileserverHandlers := apiCfg.middlewareMetricsInc(http.StripPrefix("/app", http.FileServer(http.Dir("."))))
+	router.Get("/", apiCfg.handlerIndex)
 	router.Handle("/app", fileserverHandlers)
 	router.Handle("/app/*", fileserverHandlers)
 
@@ -119,4 +120,17 @@ func (cfg *apiConfig) handlerReset(w http.ResponseWriter, r *http.Request) {
 	cfg.fileserverHits = 0
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("Hits reset"))
+}
+
+func (cfg *apiConfig) handlerIndex(w http.ResponseWriter, r *http.Request) {
+	w.Header().Add("Content-Type", "text/html")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(fmt.Sprintf(`<html>
+
+	<body>
+		<h1>Welcome to Chirpy </h1>
+		<p> Hello from Docker! I'm a Go server. </p>
+	</body>
+	
+	</html>`)))
 }
