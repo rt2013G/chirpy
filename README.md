@@ -1,10 +1,10 @@
 # chirpy
 A web server built in Go working as a Twitter back-end clone
 
-# Endpoints
+## Endpoints
 - /app - GET - Home page
 
-# API
+## API
 - api/healthz - GET - Checks readiness
 - api/reset - GET - Resets hit count
 - api/chirps - GET - Gets all the chirps
@@ -17,5 +17,13 @@ A web server built in Go working as a Twitter back-end clone
 - api/refresh - POST - Refreshes access token
 - api/revoke - POST - Revokes token
 
+## Contributing
+Clone the repo
+```bash
+git clone https://github.com/rt2013G/chirpy && cd chirpy
+```
 
-
+Build and run
+```bash
+go build -o out && ./out --debug
+```
